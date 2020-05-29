@@ -347,15 +347,15 @@ def FindSystemLibrary(library_path):
   return None
 
 def FixLibraryInstallPath(library_path, library):
-  system_library = FindSystemLibrary(library_path)
-  if system_library is None:
-    new_path = '@executable_path/../MacOS/%s' % os.path.basename(library_path)
-    FixInstallPath(library_path, library, new_path)
-  else:
-    print "Fix as system library: [%s]" % library_path
-    print "We currently don't need this and it's most likely an error if this code path is hit. Exiting."
-    sys.exit(53)
-    FixInstallPath(library_path, library, system_library)
+  #system_library = FindSystemLibrary(library_path)
+  #if system_library is None:
+  new_path = '@executable_path/../MacOS/%s' % os.path.basename(library_path)
+  FixInstallPath(library_path, library, new_path)
+  #else:
+  #  print "Fix as system library: [%s]" % library_path
+  #  print "We currently don't need this and it's most likely an error if this code path is hit. Exiting."
+  #  sys.exit(53)
+  #  FixInstallPath(library_path, library, system_library)
 
 def FixFrameworkInstallPath(library_path, library):
   parts = library_path.split(os.sep)
