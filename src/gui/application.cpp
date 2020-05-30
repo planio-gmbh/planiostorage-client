@@ -211,6 +211,13 @@ Application::Application(int &argc, char **argv)
             if (confDir.endsWith('/')) confDir.chop(1);  // macOS 10.11.x does not like trailing slash for rename/move.
             qCInfo(lcApplication) << "Migrating old config from" << oldDir << "to" << confDir;
 
+#ifdef Q_OS_MAC
+            // rename planio.cfg -> planiostorage.cfg
+            if (QFileInfo(oldDir + "/planio.cfg").isFile() && !QFileInfo(oldDir + "/" + Theme::instance()->configFileName()).isFile()) {
+                qCInfo(lcApplication) << "Migrating planio.cfg to " << Theme::instance()->configFileName();
+                QFile::rename(oldDir + "/planio.cfg", oldDir + "/" + Theme::instance()->configFileName());
+            }
+#endif
             if (!QFile::rename(oldDir, confDir)) {
                 qCWarning(lcApplication) << "Failed to move the old config directory to its new location (" << oldDir << "to" << confDir << ")";
 
@@ -229,6 +236,7 @@ Application::Application(int &argc, char **argv)
                 // Create a symbolic link so a downgrade of the client would still find the config.
                 QFile::link(confDir, oldDir);
 #endif
+
             }
         }
     }
