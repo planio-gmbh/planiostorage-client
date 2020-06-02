@@ -2,14 +2,14 @@
 Categories=Utility;X-SuSE-SyncUtility;
 Type=Application
 Exec=@APPLICATION_EXECUTABLE@
-Name=@APPLICATION_NAME@ desktop sync client 
+Name=@APPLICATION_NAME@ desktop sync client
 Comment=@APPLICATION_NAME@ desktop synchronization client
 GenericName=Folder Sync
 Icon=@APPLICATION_EXECUTABLE@
 Keywords=@APPLICATION_NAME@;syncing;file;sharing;
 X-GNOME-Autostart-Delay=3
 MimeType=application/vnd.@APPLICATION_EXECUTABLE@;
-Actions=Settings;Quit
+Actions=Settings;Quit;
 
 # Translations
 Comment[oc]=@APPLICATION_NAME@ sincronizacion del client
