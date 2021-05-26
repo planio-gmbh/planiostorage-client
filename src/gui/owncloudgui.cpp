@@ -29,6 +29,7 @@
 #include "accountmanager.h"
 #include "common/syncjournalfilerecord.h"
 #include "creds/abstractcredentials.h"
+#include "guiutility.h"
 
 #include <QDesktopServices>
 #include <QDir>
@@ -1050,13 +1051,13 @@ void ownCloudGui::slotToggleLogBrowser()
 void ownCloudGui::slotOpenOwnCloud()
 {
     if (auto account = qvariant_cast<AccountPtr>(sender()->property(propertyAccountC))) {
-        QDesktopServices::openUrl(account->url());
+        Utility::openBrowser(account->url());
     }
 }
 
 void ownCloudGui::slotHelp()
 {
-    QDesktopServices::openUrl(QUrl(Theme::instance()->helpUrl()));
+    Utility::openBrowser(QUrl(Theme::instance()->helpUrl()));
 }
 
 void ownCloudGui::raiseDialog(QWidget *raiseWidget)

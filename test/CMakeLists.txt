@@ -16,7 +16,7 @@ include_directories(${CMAKE_SOURCE_DIR}/src
 include(owncloud_add_test.cmake)
 
 owncloud_add_test(OwncloudPropagator "")
-owncloud_add_test(Updater "")
+owncloud_add_test(Updater "../src/gui/guiutility.cpp")
 
 SET(FolderWatcher_SRC ../src/gui/folderwatcher.cpp)
 
@@ -87,7 +87,7 @@ list(APPEND FolderMan_SRC ${FolderWatcher_SRC})
 list(APPEND FolderMan_SRC stub.cpp )
 owncloud_add_test(FolderMan "${FolderMan_SRC}")
 
-owncloud_add_test(OAuth "syncenginetestutils.h;../src/gui/creds/oauth.cpp")
+owncloud_add_test(OAuth "syncenginetestutils.h;../src/gui/guiutility.cpp;../src/gui/creds/oauth.cpp")
 
 configure_file(test_journal.db "${PROJECT_BINARY_DIR}/bin/test_journal.db" COPYONLY)
 

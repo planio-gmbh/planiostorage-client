@@ -668,7 +668,7 @@ void SocketApi::command_OPEN_PRIVATE_LINK_VERSIONS(const QString &localFile, Soc
         QUrlQuery query(url);
         query.addQueryItem(QStringLiteral("details"), QStringLiteral("versionsTabView"));
         url.setQuery(query);
-        Utility::openBrowser(url, nullptr);
+        Utility::openBrowser(url);
     };
     fetchPrivateLinkUrlHelper(localFile, openVersionsLink);
 }
@@ -787,7 +787,7 @@ void SocketApi::emailPrivateLink(const QString &link)
 
 void OCC::SocketApi::openPrivateLink(const QString &link)
 {
-    Utility::openBrowser(link, nullptr);
+    Utility::openBrowser(link);
 }
 
 void SocketApi::command_GET_STRINGS(const QString &argument, SocketListener *listener)
