@@ -138,6 +138,15 @@ if (NOT OWNCLOUD_ICONS)
 endif()
 MESSAGE(STATUS "OWNCLOUD_ICONS: ${APPLICATION_ICON_NAME}: ${OWNCLOUD_ICONS}")
 
+# Ship the GPL license text with every package. share/doc is stripped by the
+# craft packager blacklists, so use share/licenses (kept) on unix; on Windows
+# the file goes to the installation root.
+if(WIN32)
+    install(FILES COPYING DESTINATION . RENAME COPYING.txt)
+else()
+    install(FILES COPYING DESTINATION ${KDE_INSTALL_DATADIR}/licenses/${LINUX_PACKAGE_SHORTNAME})
+endif()
+
 set(EXCLUDE_FILE_NAME "sync-exclude.lst")
 
 if(APPLE)

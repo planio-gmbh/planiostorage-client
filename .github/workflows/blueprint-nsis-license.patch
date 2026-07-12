@@ -1,0 +1,24 @@
+diff --git a/owncloud/owncloud-client/owncloud-client.py b/owncloud/owncloud-client/owncloud-client.py
+index 9d04307..c3b3a36 100755
+--- a/owncloud/owncloud-client/owncloud-client.py
++++ b/owncloud/owncloud-client/owncloud-client.py
+@@ -256,6 +256,8 @@ class Package(CMakePackageBase):
+         self.defines["appimage_native_package_name"] = f'{self.applicationShortname.lower().replace("_", "-")}-client'
+         self.defines["apppath"] = "Applications/KDE/" + self.applicationExecutable + ".app"
+         self.defines["company"] = "ownCloud GmbH"
++        # show the GPL in the Windows installer's license page
++        self.defines["license"] = str(self.sourceDir() / "COPYING")
+ 
+         exePath = f"{self.defines['appname']}{CraftCore.compiler.executableSuffix}"
+         if isinstance(self, NullsoftInstallerPackager):
+@@ -267,7 +269,9 @@ class Package(CMakePackageBase):
+                 "description": self.subinfo.description,
+             }
+         ]
+-        self.defines["icon"] = self.buildDir() / "src/gui/owncloud.ico"
++        # the .ico is generated as <APPLICATION_ICON_NAME>.ico, which matches
++        # the executable name for branded builds
++        self.defines["icon"] = self.buildDir() / f"src/gui/{self.applicationExecutable}.ico"
+         self.defines["pkgproj"] = self.buildDir() / "admin/osx/macosx.pkgproj"
+         if CraftPackageObject.get("dev-utils/linuxdeploy-plugin-native-packages").isInstalled:
+             self.defines["appimage_extra_output"] = ["native_packages"]

@@ -90,6 +90,10 @@ jobs:
       run: |
         & "${env:GITHUB_WORKSPACE}/.github/workflows/.craft.ps1" -c --unshelve "${env:GITHUB_WORKSPACE}/.craft.shelf"
 
+    - name: Patch blueprint (NSIS license page)
+      run: |
+        git -C "$env:HOME/craft/CraftMaster/blueprints/craft-blueprints-owncloud" apply "${env:GITHUB_WORKSPACE}/.github/workflows/blueprint-nsis-license.patch"
+
     - name: Prepare
       run: |
         New-Item -ItemType Directory "${env:GITHUB_WORKSPACE}/binaries/"
