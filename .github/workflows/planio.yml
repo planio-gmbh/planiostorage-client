@@ -1,0 +1,136 @@
+name: Planio Storage client
+
+# Builds the Planio-branded client for Windows, macOS and Linux (AppImage).
+# The theme lives in-tree at ./branding, which THEME.cmake picks up
+# automatically.
+#
+# Code signing is NOT configured yet; artifacts are unsigned.
+
+on:
+  push:
+    branches:
+      - 'planio/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: pwsh
+
+env:
+  # Consumed by the owncloud-client craft blueprint when packaging, so it
+  # finds the branded .desktop file / app bundle
+  ApplicationExecutable: PlanioStorage
+  ApplicationShortname: Planio Storage
+  # Let AppImage tools self-extract when FUSE is unavailable (job containers)
+  APPIMAGE_EXTRACT_AND_RUN: 1
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows-cl-x86_64
+            target: windows-cl-msvc2022-x86_64
+            # windows-latest no longer carries VS 2022, which the msvc2022
+            # target needs (upstream pins this runner too)
+            os: windows-2022
+            container:
+          - name: macos-clang-arm64
+            target: macos-clang-arm64
+            # macos-latest is migrating to macOS 26 (Xcode 26) whose SDK the
+            # Qt 6.8.3-era toolchain predates; stay on the Xcode 16 image
+            os: macos-15
+            container:
+          - name: linux-gcc-x86_64
+            target: linux-64-gcc
+            os: ubuntu-latest
+            container: owncloudci/appimage-build:sles15-amd64
+
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
+
+    env:
+      CRAFT_TARGET: ${{ matrix.target }}
+
+    steps:
+    - name: Check out client
+      uses: actions/checkout@v7
+      with:
+        fetch-depth: 0
+
+    - uses: actions/setup-python@v6
+      if: matrix.name == 'windows-cl-x86_64'
+      with:
+        python-version: '3.12'
+
+    - name: Restore cache
+      uses: actions/cache@v6
+      with:
+        path: ~/cache
+        key: ${{ runner.os }}-${{ matrix.target }}
+
+    - name: Clone CraftMaster
+      run: git clone --depth=1 https://invent.kde.org/kde/craftmaster.git "$env:HOME/craft/CraftMaster/CraftMaster"
+
+    - name: Craft setup
+      run: |
+        New-Item -Path ~/cache -ItemType Directory -ErrorAction SilentlyContinue
+        & "${env:GITHUB_WORKSPACE}/.github/workflows/.craft.ps1" --setup
+
+    - name: Craft unshelve
+      run: |
+        & "${env:GITHUB_WORKSPACE}/.github/workflows/.craft.ps1" -c --unshelve "${env:GITHUB_WORKSPACE}/.craft.shelf"
+
+    - name: Prepare
+      run: |
+        New-Item -ItemType Directory "${env:GITHUB_WORKSPACE}/binaries/"
+        & "${env:GITHUB_WORKSPACE}/.github/workflows/.craft.ps1" -c --set srcDir="${env:GITHUB_WORKSPACE}" owncloud/owncloud-client
+        if ($IsWindows) {
+            & "${env:GITHUB_WORKSPACE}/.github/workflows/.craft.ps1" -c dev-utils/nsis
+        } elseif($IsLinux) {
+            & "${env:GITHUB_WORKSPACE}/.github/workflows/.craft.ps1" -c dev-utils/linuxdeploy
+        }
+
+    - name: Install dependencies
+      run: |
+        & "${env:GITHUB_WORKSPACE}/.github/workflows/.craft.ps1" -c --install-deps owncloud/owncloud-client
+
+    - name: Drop AGL fallback from cached Qt (framework gone from modern macOS SDKs)
+      if: runner.os == 'macOS'
+      run: |
+        $f = "$env:HOME/craft/CraftMaster/$env:CRAFT_TARGET/lib/cmake/Qt6/FindWrapOpenGL.cmake"
+        $needle = 'set(__opengl_agl_fw_path "-framework AGL")'
+        $c = Get-Content $f -Raw
+        if (-not $c.Contains($needle)) { throw "AGL fallback not found in $f - cached Qt changed, drop this step?" }
+        $c.Replace($needle, '# AGL fallback removed: the framework does not exist in modern macOS SDKs (fixed in newer Qt)') | Set-Content $f
+
+    - name: Build
+      run: |
+        & "${env:GITHUB_WORKSPACE}/.github/workflows/.craft.ps1" -c --no-cache owncloud/owncloud-client
+
+    - name: Run tests
+      run: |
+        & "${env:GITHUB_WORKSPACE}/.github/workflows/.craft.ps1" -c --no-cache --test owncloud/owncloud-client
+
+    - name: Package
+      run: |
+        & "${env:GITHUB_WORKSPACE}/.github/workflows/.craft.ps1" -c --no-cache --package owncloud/owncloud-client
+
+    - name: Prepare artifacts
+      run: |
+        Copy-Item "$env:HOME/craft/binaries/*" "${env:GITHUB_WORKSPACE}/binaries/" -ErrorAction SilentlyContinue
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v7
+      with:
+        name: planiostorage-${{ matrix.name }}
+        path: ${{ github.workspace }}/binaries/*
