@@ -133,7 +133,7 @@ void AccountSettings::slotOpenAccountInBrowser()
         // There is an override for the WebDAV endpoint. Remove it for normal web browsing.
         url.setPath({});
     }
-    QDesktopServices::openUrl(url);
+    Utility::openBrowser(url, this);
 }
 
 void AccountSettings::slotToggleSignInState()

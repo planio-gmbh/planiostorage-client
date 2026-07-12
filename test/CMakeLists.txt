@@ -22,6 +22,7 @@ endif()
 owncloud_add_test(ExcludedFiles)
 
 owncloud_add_test(Utility)
+owncloud_add_test(GuiUtility)
 
 owncloud_add_test(SyncEngine)
 owncloud_add_test(SyncVirtualFiles)

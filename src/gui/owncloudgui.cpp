@@ -360,7 +360,7 @@ void ownCloudGui::slotComputeOverallSyncStatus()
 
 void ownCloudGui::addAccountContextMenu(AccountStatePtr accountState, QMenu *menu)
 {
-    menu->addAction(CommonStrings::showInWebBrowser(), this, [accountState] { QDesktopServices::openUrl(accountState->account()->url()); });
+    menu->addAction(CommonStrings::showInWebBrowser(), this, [accountState] { Utility::openBrowser(accountState->account()->url(), nullptr); });
 
     FolderMan *folderMan = FolderMan::instance();
     const auto &map = folderMan->folders();
@@ -993,7 +993,7 @@ void ownCloudGui::slotToggleLogBrowser()
 
 void ownCloudGui::slotHelp()
 {
-    QDesktopServices::openUrl(QUrl(Theme::instance()->helpUrl()));
+    Utility::openBrowser(QUrl(Theme::instance()->helpUrl()), nullptr);
 }
 
 void ownCloudGui::raise()

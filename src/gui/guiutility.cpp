@@ -45,6 +45,17 @@ using namespace OCC;
 
 bool Utility::openBrowser(const QUrl &url, QWidget *errorWidgetParent)
 {
+    // URLs may originate from the server; only hand schemes a browser is
+    // supposed to handle to the OS (oauthtest is used by the OAuth unit tests)
+    const QStringList allowedUrlSchemes = {
+        QStringLiteral("http"),
+        QStringLiteral("https"),
+        QStringLiteral("oauthtest"),
+    };
+    if (!allowedUrlSchemes.contains(url.scheme())) {
+        qCWarning(lcGuiUtility) << "URL format is not supported, or it has been compromised for:" << url.toString();
+        return false;
+    }
     if (!QDesktopServices::openUrl(url)) {
         if (errorWidgetParent) {
             QMessageBox::warning(
