@@ -178,3 +178,12 @@ jobs:
       with:
         name: planiostorage-${{ matrix.name }}
         path: ${{ github.workspace }}/binaries/*
+
+    # craft buffers per-stage output and drops it unless the stage raises,
+    # so the console log often lacks the real error; the log files have it
+    - name: Upload craft logs
+      if: failure()
+      uses: actions/upload-artifact@v7
+      with:
+        name: craft-logs-${{ matrix.name }}
+        path: ~/craft/CraftMaster/logs/
