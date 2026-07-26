@@ -1,0 +1,20 @@
+diff --git a/bin/Utils/CodeSign.py b/bin/Utils/CodeSign.py
+index d3ab95fc1..6adf40524 100644
+--- a/bin/Utils/CodeSign.py
++++ b/bin/Utils/CodeSign.py
+@@ -427,9 +427,13 @@ def __notarizeMacPackage(packagePath: Path):
+         message=f"Enter the app password for {appleID}",
+         key="MAC_APP_PASSWORD",
+     )
+-    return utils.system(
++    if not utils.system(
+         ["xcrun", "notarytool", "submit", packagePath, "--wait", "--apple-id", appleID, "--team-id", teamId, "--password", password], secret=[password]
+-    )
++    ):
++        return False
++    # attach the notarization ticket so Gatekeeper can verify the package
++    # without contacting Apple
++    return utils.system(["xcrun", "stapler", "staple", packagePath])
+ 
+ 
+ def signMacPackage(packagePath: str):
