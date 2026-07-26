@@ -1,8 +1,16 @@
 diff --git a/bin/utils.py b/bin/utils.py
-index 842a3a7f4..eba776c58 100644
+index 842a3a7f4..d218322e9 100644
 --- a/bin/utils.py
 +++ b/bin/utils.py
-@@ -1362,8 +1362,22 @@ def redact(input: str, secrests: set[str]):
+@@ -1359,11 +1359,40 @@ def redact(input: str, secrests: set[str]):
+         return out
+ 
+ 
++def _isBundleMainExecutable(file: Path) -> bool:
++    bundle = file.parent.parent.parent
++    return file.parent.name == "MacOS" and file.parent.parent.name == "Contents" and bundle.suffix in {".app", ".appex"} and file.name == bundle.stem
++
++
  def localSignMac(binaries):
      # TODO: this rather fits to CodeSign.py but we would end up with circular import in utils.strip
      CraftCore.log.debug(f"Local signing {[str(x) for x in binaries]}")
@@ -12,15 +20,25 @@ index 842a3a7f4..eba776c58 100644
 +    # dylibs with stale signatures, which the arm64 kernel kills with
 +    # "Code Signature Invalid" when they are loaded. Sign every Mach-O file
 +    # individually, innermost first, then seal the bundle itself.
++    # Pointing codesign at a bundle's main executable signs the whole bundle
++    # and fails on yet-unsigned nested code (x86_64 linkers do not ad-hoc
++    # sign at link time like arm64 ones do), so main executables go last,
++    # and a main executable passed as a single file is widened to its bundle.
 +    targets = []
 +    for binary in binaries:
 +        binary = Path(binary)
++        if not binary.is_dir() and _isBundleMainExecutable(binary):
++            binary = binary.parent.parent.parent
 +        if binary.is_dir():
-+            for root, dirs, files in os.walk(binary):
-+                for name in files:
++            files = []
++            for root, dirs, names in os.walk(binary):
++                for name in names:
 +                    file = Path(root) / name
 +                    if isBinary(file):
-+                        targets.append(file)
++                        files.append(file)
++            # nested bundles' main executables before the outer ones
++            files.sort(key=lambda f: (_isBundleMainExecutable(f), -len(f.parts), str(f)))
++            targets += files
 +        targets.append(binary)
 +    signCommand = ["codesign", "-s", "-", "-f", "--preserve-metadata=identifier,entitlements", "--verbose=99"]
 +    for command in limitCommandLineLength(signCommand, targets):
