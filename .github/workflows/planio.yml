@@ -129,7 +129,7 @@ jobs:
         MAC_CERT_P12: ${{ secrets.MAC_CERT_P12 }}
       run: |
         if (-not $env:MAC_CERT_P12) {
-            Write-Host "No signing certificate configured; the package will only be ad-hoc signed"
+            Write-Host "::warning::MAC_CERT_P12 secret not available - the macOS package will only be ad-hoc signed"
             exit 0
         }
         $p12 = "$env:HOME/planio-devid.p12"
