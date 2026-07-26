@@ -1,8 +1,8 @@
 diff --git a/owncloud/owncloud-client/owncloud-client.py b/owncloud/owncloud-client/owncloud-client.py
-index 9d04307..fbecb16 100755
+index 9d04307..6f6b248 100755
 --- a/owncloud/owncloud-client/owncloud-client.py
 +++ b/owncloud/owncloud-client/owncloud-client.py
-@@ -255,19 +255,27 @@ class Package(CMakePackageBase):
+@@ -255,25 +255,36 @@ class Package(CMakePackageBase):
          self.defines["appname"] = self.applicationExecutable
          self.defines["appimage_native_package_name"] = f'{self.applicationShortname.lower().replace("_", "-")}-client'
          self.defines["apppath"] = "Applications/KDE/" + self.applicationExecutable + ".app"
@@ -34,3 +34,12 @@ index 9d04307..fbecb16 100755
          self.defines["pkgproj"] = self.buildDir() / "admin/osx/macosx.pkgproj"
          if CraftPackageObject.get("dev-utils/linuxdeploy-plugin-native-packages").isInstalled:
              self.defines["appimage_extra_output"] = ["native_packages"]
+         ver = self.owncloudVersion()
+         if ver:
+             self.defines["version"] = ver
++            if CraftCore.compiler.isMacOS:
++                # name the disk image after the application, not the blueprint
++                self.defines["setupname"] = self.packageDestinationDir() / f"{self.applicationExecutable}-{ver}-{CraftCore.compiler.architecture.name}"
+ 
+         self.addExecutableFilter(r"(bin|libexec)/(?!(" + self.applicationExecutable + r")).*")
+         self.ignoredPackages += ["binary/mysql"]
