@@ -84,6 +84,7 @@ jobs:
       if: runner.os == 'macOS'
       env:
         MAC_CERT_P12: ${{ secrets.MAC_CERT_P12 }}
+        MAC_APPLE_ID: ${{ secrets.MAC_APPLE_ID }}
       run: |
         if (-not $env:MAC_CERT_P12) {
             Write-Host "::warning::MAC_CERT_P12 secret not available - the macOS package will only be ad-hoc signed"
@@ -93,6 +94,7 @@ jobs:
         [IO.File]::WriteAllBytes($p12, [Convert]::FromBase64String($env:MAC_CERT_P12))
         Add-Content $env:GITHUB_ENV "SIGN_PACKAGE=True"
         Add-Content $env:GITHUB_ENV "MAC_CERTIFICATE_APPLICATION=$p12"
+        Add-Content $env:GITHUB_ENV "MAC_APPLE_ID=$env:MAC_APPLE_ID"
 
     - name: Clone CraftMaster
       run: git clone --depth=1 https://invent.kde.org/kde/craftmaster.git "$env:HOME/craft/CraftMaster/CraftMaster"
@@ -149,10 +151,10 @@ jobs:
 
     - name: Package
       env:
-        # craft's CI password lookup expects the CRAFT_SECRET_ prefix
+        # craft's CI password lookup expects the CRAFT_SECRET_ prefix; unlike
+        # the settings above, these are read at runtime, not baked at setup
         CRAFT_SECRET_MAC_CERTIFICATE_APPLICATION_PASSWORD: ${{ secrets.MAC_CERTIFICATE_APPLICATION_PASSWORD }}
         CRAFT_SECRET_MAC_APP_PASSWORD: ${{ secrets.MAC_APP_PASSWORD }}
-        MAC_APPLE_ID: ${{ secrets.MAC_APPLE_ID }}
       run: |
         & "${env:GITHUB_WORKSPACE}/.github/workflows/.craft.ps1" -c --no-cache --package owncloud/owncloud-client
 
