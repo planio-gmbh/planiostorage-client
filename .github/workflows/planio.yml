@@ -122,6 +122,20 @@ jobs:
         if (-not $c.Contains($needle)) { throw "AGL fallback not found in $f - cached Qt changed, drop this step?" }
         $c.Replace($needle, '# AGL fallback removed: the framework does not exist in modern macOS SDKs (fixed in newer Qt)') | Set-Content $f
 
+    - name: Set up code signing
+      if: runner.os == 'macOS'
+      env:
+        MAC_CERT_P12: ${{ secrets.MAC_CERT_P12 }}
+      run: |
+        if (-not $env:MAC_CERT_P12) {
+            Write-Host "No signing certificate configured; the package will only be ad-hoc signed"
+            exit 0
+        }
+        $p12 = "$env:HOME/planio-devid.p12"
+        [IO.File]::WriteAllBytes($p12, [Convert]::FromBase64String($env:MAC_CERT_P12))
+        Add-Content $env:GITHUB_ENV "SIGN_PACKAGE=True"
+        Add-Content $env:GITHUB_ENV "MAC_CERTIFICATE_APPLICATION=$p12"
+
     - name: Build
       run: |
         & "${env:GITHUB_WORKSPACE}/.github/workflows/.craft.ps1" -c --no-cache owncloud/owncloud-client
@@ -131,6 +145,11 @@ jobs:
         & "${env:GITHUB_WORKSPACE}/.github/workflows/.craft.ps1" -c --no-cache --test owncloud/owncloud-client
 
     - name: Package
+      env:
+        # craft's CI password lookup expects the CRAFT_SECRET_ prefix
+        CRAFT_SECRET_MAC_CERTIFICATE_APPLICATION_PASSWORD: ${{ secrets.MAC_CERTIFICATE_APPLICATION_PASSWORD }}
+        CRAFT_SECRET_MAC_APP_PASSWORD: ${{ secrets.MAC_APP_PASSWORD }}
+        MAC_APPLE_ID: ${{ secrets.MAC_APPLE_ID }}
       run: |
         & "${env:GITHUB_WORKSPACE}/.github/workflows/.craft.ps1" -c --no-cache --package owncloud/owncloud-client
 
