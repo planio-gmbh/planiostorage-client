@@ -1,18 +1,30 @@
 diff --git a/owncloud/owncloud-client/owncloud-client.py b/owncloud/owncloud-client/owncloud-client.py
-index 9d04307..c3b3a36 100755
+index 9d04307..fbecb16 100755
 --- a/owncloud/owncloud-client/owncloud-client.py
 +++ b/owncloud/owncloud-client/owncloud-client.py
-@@ -256,6 +256,8 @@ class Package(CMakePackageBase):
+@@ -255,19 +255,27 @@ class Package(CMakePackageBase):
+         self.defines["appname"] = self.applicationExecutable
          self.defines["appimage_native_package_name"] = f'{self.applicationShortname.lower().replace("_", "-")}-client'
          self.defines["apppath"] = "Applications/KDE/" + self.applicationExecutable + ".app"
-         self.defines["company"] = "ownCloud GmbH"
+-        self.defines["company"] = "ownCloud GmbH"
++        self.defines["company"] = "Planio GmbH"
++        # brand the installer surface (window title, install dir, registry,
++        # Add/Remove entry) after the application, not upstream's display name
++        self.defines["productname"] = self.applicationShortname
++        self.defines["display_name"] = self.applicationShortname
 +        # show the GPL in the Windows installer's license page
 +        self.defines["license"] = str(self.sourceDir() / "COPYING")
  
          exePath = f"{self.defines['appname']}{CraftCore.compiler.executableSuffix}"
          if isinstance(self, NullsoftInstallerPackager):
-@@ -267,7 +269,9 @@ class Package(CMakePackageBase):
-                 "description": self.subinfo.description,
+             exePath = f"bin/{exePath}"
+         self.defines["shortcuts"] = [
+             {
+-                "name": self.subinfo.displayName,
++                "name": self.applicationShortname,
+                 "target": exePath,
+-                "description": self.subinfo.description,
++                "description": f"{self.applicationShortname} desktop sync client",
              }
          ]
 -        self.defines["icon"] = self.buildDir() / "src/gui/owncloud.ico"

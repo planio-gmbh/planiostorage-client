@@ -90,9 +90,9 @@ jobs:
       run: |
         & "${env:GITHUB_WORKSPACE}/.github/workflows/.craft.ps1" -c --unshelve "${env:GITHUB_WORKSPACE}/.craft.shelf"
 
-    - name: Patch blueprint (NSIS license page)
+    - name: Patch blueprint (branded packaging)
       run: |
-        git -C "$env:HOME/craft/CraftMaster/blueprints/craft-blueprints-owncloud" apply "${env:GITHUB_WORKSPACE}/.github/workflows/blueprint-nsis-license.patch"
+        git -C "$env:HOME/craft/CraftMaster/blueprints/craft-blueprints-owncloud" apply "${env:GITHUB_WORKSPACE}/.github/workflows/blueprint-branded-packaging.patch"
 
     - name: Patch craft (macOS signing fixes)
       if: runner.os == 'macOS'
