@@ -94,6 +94,11 @@ jobs:
       run: |
         git -C "$env:HOME/craft/CraftMaster/blueprints/craft-blueprints-owncloud" apply "${env:GITHUB_WORKSPACE}/.github/workflows/blueprint-nsis-license.patch"
 
+    - name: Patch craft (ad-hoc sign nested Mach-Os individually)
+      if: runner.os == 'macOS'
+      run: |
+        git -C "$env:HOME/craft/CraftMaster/craft-clone" apply "${env:GITHUB_WORKSPACE}/.github/workflows/craft-adhoc-sign.patch"
+
     - name: Prepare
       run: |
         New-Item -ItemType Directory "${env:GITHUB_WORKSPACE}/binaries/"

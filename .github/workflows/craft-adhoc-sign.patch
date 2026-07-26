@@ -1,0 +1,29 @@
+diff --git a/bin/utils.py b/bin/utils.py
+index 842a3a7f4..eba776c58 100644
+--- a/bin/utils.py
++++ b/bin/utils.py
+@@ -1362,8 +1362,22 @@ def redact(input: str, secrests: set[str]):
+ def localSignMac(binaries):
+     # TODO: this rather fits to CodeSign.py but we would end up with circular import in utils.strip
+     CraftCore.log.debug(f"Local signing {[str(x) for x in binaries]}")
+-    signCommand = ["codesign", "-s", "-", "-f", "--deep", "--preserve-metadata=identifier,entitlements", "--verbose=99"]
+-    for command in limitCommandLineLength(signCommand, binaries):
++    # codesign --deep is unreliable for nested code: it can leave Qt plugin
++    # dylibs with stale signatures, which the arm64 kernel kills with
++    # "Code Signature Invalid" when they are loaded. Sign every Mach-O file
++    # individually, innermost first, then seal the bundle itself.
++    targets = []
++    for binary in binaries:
++        binary = Path(binary)
++        if binary.is_dir():
++            for root, dirs, files in os.walk(binary):
++                for name in files:
++                    file = Path(root) / name
++                    if isBinary(file):
++                        targets.append(file)
++        targets.append(binary)
++    signCommand = ["codesign", "-s", "-", "-f", "--preserve-metadata=identifier,entitlements", "--verbose=99"]
++    for command in limitCommandLineLength(signCommand, targets):
+         with StageLogger("localSignMac", buffered=True, outputOnFailure=True):
+             if not system(command, logCommand=False):
+                 return False
