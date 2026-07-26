@@ -49,6 +49,11 @@ jobs:
             # Qt 6.8.3-era toolchain predates; stay on the Xcode 16 image
             os: macos-15
             container:
+          - name: macos-clang-x86_64
+            target: macos-64-clang
+            # GitHub's last Intel image; x86_64 macOS runners end in Aug 2027
+            os: macos-15-intel
+            container:
           - name: linux-gcc-x86_64
             target: linux-64-gcc
             os: ubuntu-latest
