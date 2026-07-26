@@ -78,6 +78,22 @@ jobs:
         path: ~/cache
         key: ${{ runner.os }}-${{ matrix.target }}
 
+    # must run before "Craft setup": CraftMaster resolves ${Env:...}
+    # interpolations once during setup and bakes them into CraftSettings.ini
+    - name: Set up code signing
+      if: runner.os == 'macOS'
+      env:
+        MAC_CERT_P12: ${{ secrets.MAC_CERT_P12 }}
+      run: |
+        if (-not $env:MAC_CERT_P12) {
+            Write-Host "::warning::MAC_CERT_P12 secret not available - the macOS package will only be ad-hoc signed"
+            exit 0
+        }
+        $p12 = "$env:HOME/planio-devid.p12"
+        [IO.File]::WriteAllBytes($p12, [Convert]::FromBase64String($env:MAC_CERT_P12))
+        Add-Content $env:GITHUB_ENV "SIGN_PACKAGE=True"
+        Add-Content $env:GITHUB_ENV "MAC_CERTIFICATE_APPLICATION=$p12"
+
     - name: Clone CraftMaster
       run: git clone --depth=1 https://invent.kde.org/kde/craftmaster.git "$env:HOME/craft/CraftMaster/CraftMaster"
 
@@ -123,20 +139,6 @@ jobs:
         if (-not $c.Contains($needle)) { throw "AGL fallback not found in $f - cached Qt changed, drop this step?" }
         $c.Replace($needle, '# AGL fallback removed: the framework does not exist in modern macOS SDKs (fixed in newer Qt)') | Set-Content $f
 
-    - name: Set up code signing
-      if: runner.os == 'macOS'
-      env:
-        MAC_CERT_P12: ${{ secrets.MAC_CERT_P12 }}
-      run: |
-        if (-not $env:MAC_CERT_P12) {
-            Write-Host "::warning::MAC_CERT_P12 secret not available - the macOS package will only be ad-hoc signed"
-            exit 0
-        }
-        $p12 = "$env:HOME/planio-devid.p12"
-        [IO.File]::WriteAllBytes($p12, [Convert]::FromBase64String($env:MAC_CERT_P12))
-        Add-Content $env:GITHUB_ENV "SIGN_PACKAGE=True"
-        Add-Content $env:GITHUB_ENV "MAC_CERTIFICATE_APPLICATION=$p12"
-
     - name: Build
       run: |
         & "${env:GITHUB_WORKSPACE}/.github/workflows/.craft.ps1" -c --no-cache owncloud/owncloud-client
@@ -157,6 +159,19 @@ jobs:
     - name: Prepare artifacts
       run: |
         Copy-Item "$env:HOME/craft/binaries/*" "${env:GITHUB_WORKSPACE}/binaries/" -ErrorAction SilentlyContinue
+
+    - name: Verify macOS package signature
+      if: env.SIGN_PACKAGE == 'True'
+      run: |
+        $dmg = Get-ChildItem "${env:GITHUB_WORKSPACE}/binaries/*.dmg" | Select-Object -First 1
+        if (-not $dmg) { throw "no dmg found in binaries/" }
+        $info = codesign -dvv $dmg.FullName 2>&1 | Out-String
+        Write-Host $info
+        if ($info -notmatch "Developer ID Application: Planio GmbH") {
+            throw "dmg is not signed with the Planio Developer ID"
+        }
+        xcrun stapler validate $dmg.FullName
+        if ($LASTEXITCODE -ne 0) { throw "notarization ticket is not stapled" }
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v7
