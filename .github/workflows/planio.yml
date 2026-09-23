@@ -4,12 +4,19 @@ name: Planio Storage client
 # The theme lives in-tree at ./branding, which THEME.cmake picks up
 # automatically.
 #
-# Code signing is NOT configured yet; artifacts are unsigned.
+# macOS packages are signed and notarized whenever the Developer ID secrets
+# are available. Windows packages are signed with Azure Artifact Signing,
+# which is metered, so that only happens for release tags: v<upstream
+# version>-planio.<N>, e.g. v6.0.3-planio.1. Tag runs use the "release"
+# environment, which holds the Azure OIDC secrets and is what the federated
+# credential in Azure trusts.
 
 on:
   push:
     branches:
       - 'planio/**'
+    tags:
+      - 'v*-planio.*'
   workflow_dispatch:
 
 permissions:
@@ -30,6 +37,10 @@ env:
   ApplicationShortname: Planio Storage
   # Let AppImage tools self-extract when FUSE is unavailable (job containers)
   APPIMAGE_EXTRACT_AND_RUN: 1
+  # Azure Artifact Signing account and certificate profile (North Europe)
+  AZURE_SIGNING_ENDPOINT: https://neu.codesigning.azure.net
+  AZURE_SIGNING_ACCOUNT: PLANIO_SIGNING_ACCOUNT_NAME
+  AZURE_SIGNING_CERTIFICATE_PROFILE: storageclient-release
 
 jobs:
   build:
@@ -62,9 +73,17 @@ jobs:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     container: ${{ matrix.container }}
+    # release tags deploy to the "release" environment (Azure OIDC secrets);
+    # everything else runs in a plain "ci" environment with no secrets
+    environment: ${{ startsWith(github.ref, 'refs/tags/') && 'release' || 'ci' }}
+    permissions:
+      contents: read
+      # mint the OIDC token for azure/login
+      id-token: write
 
     env:
       CRAFT_TARGET: ${{ matrix.target }}
+      SIGN_WINDOWS: ${{ matrix.name == 'windows-cl-x86_64' && startsWith(github.ref, 'refs/tags/') }}
 
     steps:
     - name: Check out client
@@ -154,6 +173,68 @@ jobs:
       run: |
         & "${env:GITHUB_WORKSPACE}/.github/workflows/.craft.ps1" -c --no-cache --test owncloud/owncloud-client
 
+    # Signing is switched on only now, in the generated craft settings: with
+    # CodeSigning enabled from the start, craft would also sign every binary
+    # of every dependency it restores from its cache. The custom sign command
+    # replaces craft's built-in signtool call for the packaged binaries, the
+    # 7-Zip helper and the installer.
+    - name: Set up Windows code signing
+      if: env.SIGN_WINDOWS == 'true'
+      run: |
+        $tools = "${env:RUNNER_TEMP}/artifact-signing"
+        nuget install Microsoft.Windows.SDK.BuildTools -ExcludeVersion -OutputDirectory $tools
+        nuget install Microsoft.ArtifactSigning.Client -ExcludeVersion -OutputDirectory $tools
+        $signtool = Get-ChildItem "$tools/Microsoft.Windows.SDK.BuildTools/bin/*/x64/signtool.exe" |
+            Sort-Object { [version]$_.Directory.Parent.Name } -Descending | Select-Object -First 1
+        $dlib = Get-ChildItem "$tools/Microsoft.ArtifactSigning.Client/bin/x64/Azure.CodeSigning.Dlib.dll"
+        if (-not $signtool -or -not $dlib) { throw "signtool or the Artifact Signing dlib was not found under $tools" }
+        $metadata = "$tools/metadata.json"
+        @{
+            Endpoint = $env:AZURE_SIGNING_ENDPOINT
+            CodeSigningAccountName = $env:AZURE_SIGNING_ACCOUNT
+            CertificateProfileName = $env:AZURE_SIGNING_CERTIFICATE_PROFILE
+            CorrelationId = "$env:GITHUB_REPOSITORY/$env:GITHUB_RUN_ID"
+            # azure/login below provides the Azure CLI credential; skip the rest
+            ExcludeCredentials = @(
+                "EnvironmentCredential", "ManagedIdentityCredential", "WorkloadIdentityCredential",
+                "SharedTokenCacheCredential", "VisualStudioCredential", "VisualStudioCodeCredential",
+                "AzurePowerShellCredential", "AzureDeveloperCliCredential", "InteractiveBrowserCredential"
+            )
+        } | ConvertTo-Json | Set-Content $metadata
+        Add-Content $env:GITHUB_ENV "WINDOWS_SIGNTOOL=$($signtool.FullName)"
+        Add-Content $env:GITHUB_ENV "WINDOWS_SIGN_DLIB=$($dlib.FullName)"
+        Add-Content $env:GITHUB_ENV "WINDOWS_SIGN_METADATA=$metadata"
+        Add-Content $env:GITHUB_ENV "WINDOWS_SIGN_LOG=$tools/signed-files.log"
+
+        $settings = "$env:HOME/craft/CraftMaster/$env:CRAFT_TARGET/etc/CraftSettings.ini"
+        $script = "${env:GITHUB_WORKSPACE}/.github/workflows/sign-windows.ps1".Replace('\', '/')
+        $enableSigning = @'
+        import configparser, sys
+        path, command = sys.argv[1:]
+        settings = configparser.ConfigParser(interpolation=None)
+        settings.optionxform = str
+        settings.read(path, encoding="utf-8")
+        settings["CodeSigning"]["Enabled"] = "True"
+        # craft defaults SignCache to Enabled; with it on, binaries that come
+        # from craft's cache (Qt, OpenSSL, ...) would be left unsigned
+        settings["CodeSigning"]["SignCache"] = "False"
+        settings["CodeSigning"]["WindowsCustomSignCommand"] = command
+        with open(path, "w", encoding="utf-8") as out:
+            settings.write(out)
+        '@
+        python -c $enableSigning $settings "pwsh -NoProfile -File $script %F"
+        if ($LASTEXITCODE -ne 0) { throw "failed to enable code signing in $settings" }
+        Get-Content $settings | Select-String -Pattern "^\[CodeSigning\]" -Context 0, 8
+
+    # the Azure CLI token is short-lived, so log in right before packaging
+    - name: Azure login for Artifact Signing
+      if: env.SIGN_WINDOWS == 'true'
+      uses: azure/login@v3
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
     - name: Package
       env:
         # craft's CI password lookup expects the CRAFT_SECRET_ prefix; unlike
@@ -179,6 +260,22 @@ jobs:
         }
         xcrun stapler validate $dmg.FullName
         if ($LASTEXITCODE -ne 0) { throw "notarization ticket is not stapled" }
+
+    - name: Verify Windows package signatures
+      if: env.SIGN_WINDOWS == 'true'
+      run: |
+        $signed = @(Get-Content $env:WINDOWS_SIGN_LOG)
+        Write-Host "craft signed $($signed.Count) files"
+        # the installer alone means the packaged binaries were skipped
+        if ($signed.Count -lt 2) { throw "expected the packaged binaries and the installer to be signed" }
+        $installers = @(Get-ChildItem "${env:GITHUB_WORKSPACE}/binaries/*.exe")
+        if (-not $installers) { throw "no installer found in binaries/" }
+        foreach ($installer in $installers) {
+            $info = & $env:WINDOWS_SIGNTOOL verify /pa /v $installer.FullName 2>&1 | Out-String
+            Write-Host $info
+            if ($LASTEXITCODE -ne 0) { throw "$($installer.Name) has no valid signature" }
+            if ($info -notmatch "Issued to: Planio GmbH") { throw "$($installer.Name) is not signed with the Planio certificate" }
+        }
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v7
