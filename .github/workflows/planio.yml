@@ -39,7 +39,7 @@ env:
   APPIMAGE_EXTRACT_AND_RUN: 1
   # Azure Artifact Signing account and certificate profile (North Europe)
   AZURE_SIGNING_ENDPOINT: https://neu.codesigning.azure.net
-  AZURE_SIGNING_ACCOUNT: PLANIO_SIGNING_ACCOUNT_NAME
+  AZURE_SIGNING_ACCOUNT: PlanioGmbH
   AZURE_SIGNING_CERTIFICATE_PROFILE: storageclient-release
 
 jobs:
