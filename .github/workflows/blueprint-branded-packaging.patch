@@ -1,5 +1,5 @@
 diff --git a/owncloud/owncloud-client/owncloud-client.py b/owncloud/owncloud-client/owncloud-client.py
-index 9d04307..6f6b248 100755
+index 9d04307..805e19b 100755
 --- a/owncloud/owncloud-client/owncloud-client.py
 +++ b/owncloud/owncloud-client/owncloud-client.py
 @@ -255,25 +255,36 @@ class Package(CMakePackageBase):
@@ -37,9 +37,9 @@ index 9d04307..6f6b248 100755
          ver = self.owncloudVersion()
          if ver:
              self.defines["version"] = ver
-+            if CraftCore.compiler.isMacOS:
-+                # name the disk image after the application, not the blueprint
-+                self.defines["setupname"] = self.packageDestinationDir() / f"{self.applicationExecutable}-{ver}-{CraftCore.compiler.architecture.name}"
++            # name packages after the application and its version, not the
++            # blueprint and git revision (which is "HEAD" on tag checkouts)
++            self.defines["setupname"] = self.packageDestinationDir() / f"{self.applicationExecutable}-{ver}-{CraftCore.compiler.architecture.name}"
  
          self.addExecutableFilter(r"(bin|libexec)/(?!(" + self.applicationExecutable + r")).*")
          self.ignoredPackages += ["binary/mysql"]
